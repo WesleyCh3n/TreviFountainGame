@@ -100,8 +100,8 @@ class TreviFountainGame:
         pygame.init()
         self.window = pygame.display.set_mode(SCREEN_SIZE)
         self.clock = pygame.time.Clock()
-        self.bg = Background(SCREEN_SIZE)
 
+        self.bg = Background(SCREEN_SIZE)
         self.objects = pygame.sprite.Group()
 
     def run(self):
@@ -114,19 +114,22 @@ class TreviFountainGame:
             self.window.blit(bg_img, bg_rect)
 
             for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_j:
-                        sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-                        obj = Object(OBJECT_PATHS[sel_idx], (250, 250), CENTER)
-                        glow = Glowing()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
+                    obj = Object(OBJECT_PATHS[sel_idx], (250, 250), CENTER)
+                    glow = Glowing()
 
-                        self.objects.empty()
-                        self.objects.add(glow)
-                        self.objects.add(obj)
-                        obj.start()
+                    self.objects.empty()
+                    self.objects.add(glow)
+                    self.objects.add(obj)
+                    obj.start()
+
+                if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         pygame.quit()
                         sys.exit()
+                    elif event.key == pygame.K_m:
+                        pygame.display.toggle_fullscreen()
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
