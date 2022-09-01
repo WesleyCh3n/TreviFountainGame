@@ -67,7 +67,7 @@ class Glowing(pygame.sprite.Sprite):
             pygame.image.load("./assets/glow.png"), SCREEN_SIZE
         ).convert_alpha()
         self.image: Surface = self.origin
-        self.rect: Rect
+        self.rect: Rect = self.image.get_rect(center=CENTER)
 
         self.alpha = 0
         self.angle = 0
@@ -105,10 +105,6 @@ class TreviFountainGame:
             self.window.fill(BLACK)
             self.clock.tick(FPS)
 
-            self.bg.update()
-            bg_img, bg_rect = mask(self.bg.image, self.bg.rect)
-            self.window.blit(bg_img, bg_rect)
-
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
@@ -129,7 +125,11 @@ class TreviFountainGame:
                     pygame.quit()
                     sys.exit()
 
+            self.bg.update()
+            bg_img, bg_rect = mask(self.bg.image, self.bg.rect)
             self.objects.update()
+
+            self.window.blit(bg_img, bg_rect)
             for obj in self.objects:
                 self.window.blit(obj.image, obj.rect)  # type: ignore
             pygame.display.update()
