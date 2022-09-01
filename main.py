@@ -36,36 +36,28 @@ def mask(image: Surface, rect: Rect) -> tuple[Surface, Rect]:
 
 
 class Object(pygame.sprite.Sprite):
-    def __init__(self, image_path: str, size: tuple, center: tuple):
+    def __init__(self, image_path: str, size: tuple):
         super().__init__()
         self.image: pygame.surface.Surface = pygame.transform.scale(
             pygame.image.load(image_path), size
         ).convert_alpha()
-        self.rect: pygame.rect.Rect = self.image.get_rect()
-        self.rect.center = center
+        self.rect: pygame.rect.Rect = self.image.get_rect(center=CENTER)
 
-        self.size = size
-        self.alpha = 1
-
-        self.is_fade_in = False
-        self.timeout = 0
+        self.alpha = 0
+        self.time = 0
 
     def update(self):
-        self.timeout += 1
-        if self.timeout > OBJECT_TIME * FPS:
-            self.alpha -= FADE_SPEED
-            if self.alpha < 0:
-                self.kill()
-            self.image.set_alpha(self.alpha)
-        if self.is_fade_in:
-            self.image.set_alpha(self.alpha)
+        self.time += 1
+        if self.time < 2 * FPS:
             self.alpha += FADE_SPEED
-            if self.alpha > 255:
-                self.image.set_alpha(255)
-                self.is_fade_in = False
+        elif self.time > OBJECT_TIME * FPS:
+            self.alpha -= FADE_SPEED
+        else:
+            self.alpha = 255
 
-    def start(self):
-        self.is_fade_in = True
+        if self.alpha < 0:
+            self.kill()
+        self.image.set_alpha(self.alpha)
 
 
 class Glowing(pygame.sprite.Sprite):
@@ -77,22 +69,26 @@ class Glowing(pygame.sprite.Sprite):
         self.image: Surface = self.origin
         self.rect: Rect
 
-        self.alpha = 255
+        self.alpha = 0
         self.angle = 0
-        self.timeout = 0
+        self.time = 0
 
     def update(self) -> None:
-        self.timeout += 1
-        if self.timeout > OBJECT_TIME * FPS:
+        self.time += 1
+        if self.time < 2 * FPS:
+            self.alpha += FADE_SPEED
+        elif self.time > OBJECT_TIME * FPS:
             self.alpha -= FADE_SPEED
-            if self.alpha < 0:
-                self.kill()
+        else:
+            self.alpha = 255
+
+        if self.alpha < 0:
+            self.kill()
+
         self.angle += 1
         self.image = pygame.transform.rotate(self.origin, self.angle)
         self.image.set_alpha(self.alpha)
-        self.rect = self.image.get_rect(
-            center=self.origin.get_rect(center=CENTER).center
-        )
+        self.rect = self.image.get_rect(center=CENTER)
 
 
 class TreviFountainGame:
@@ -116,13 +112,12 @@ class TreviFountainGame:
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-                    obj = Object(OBJECT_PATHS[sel_idx], (250, 250), CENTER)
+                    obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
                     glow = Glowing()
 
                     self.objects.empty()
                     self.objects.add(glow)
                     self.objects.add(obj)
-                    obj.start()
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
