@@ -1,9 +1,13 @@
+import multiprocessing as mp
 import random
 import sys
 
+from hx711 import HX711     # import the class HX711
+import RPi.GPIO as GPIO     # import GPIO
 import pygame
 from pygame.rect import Rect
 from pygame.surface import Surface
+import numpy as np
 
 from settings import *
 
@@ -21,7 +25,7 @@ class Background(pygame.sprite.Sprite):
         self.image = pygame.transform.smoothscale(
             self.origin.convert_alpha(), self.size
         )
-        self.size = (self.size[1] + 2, self.size[1] + 2)
+        self.size = (self.size[1] + 10, self.size[1] + 10)
         if self.size[0] == 1200:
             self.size = self.init_size
         self.rect = self.image.get_rect()
@@ -48,7 +52,7 @@ class Object(pygame.sprite.Sprite):
 
     def update(self):
         self.time += 1
-        if self.time < 2 * FPS:
+        if self.time < (FADE_SPEED / 255) * FPS:
             self.alpha += FADE_SPEED
         elif self.time > OBJECT_TIME * FPS:
             self.alpha -= FADE_SPEED
@@ -75,7 +79,7 @@ class Glowing(pygame.sprite.Sprite):
 
     def update(self) -> None:
         self.time += 1
-        if self.time < 2 * FPS:
+        if self.time < (FADE_SPEED / 255) * FPS:
             self.alpha += FADE_SPEED
         elif self.time > OBJECT_TIME * FPS:
             self.alpha -= FADE_SPEED
@@ -85,7 +89,7 @@ class Glowing(pygame.sprite.Sprite):
         if self.alpha < 0:
             self.kill()
 
-        self.angle += 1
+        self.angle += 20
         self.image = pygame.transform.rotate(self.origin, self.angle)
         self.image.set_alpha(self.alpha)
         self.rect = self.image.get_rect(center=CENTER)
@@ -100,10 +104,31 @@ class TreviFountainGame:
         self.bg = Background(SCREEN_SIZE)
         self.objects = pygame.sprite.Group()
 
+        self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel='A')
+        self.hx.reset()
+        self.prev_data = 0
+        self.frame = 0
+
     def run(self):
         while True:
             self.window.fill(BLACK)
             self.clock.tick(FPS)
+            self.frame += 1
+            if self.frame > int(FPS/4):
+                data = -np.mean(self.hx.get_raw_data())
+                gap = data - self.prev_data
+                print(f"{data=} {self.prev_data=} {gap=}")
+                if gap > 1000 and gap < 10000:
+                    sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
+                    obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
+                    glow = Glowing()
+
+                    self.objects.empty()
+                    self.objects.add(glow)
+                    self.objects.add(obj)
+
+                self.prev_data = data
+                self.frame = 0
 
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
@@ -118,12 +143,10 @@ class TreviFountainGame:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         pygame.quit()
-                        sys.exit()
                     elif event.key == pygame.K_m:
                         pygame.display.toggle_fullscreen()
                 if event.type == pygame.QUIT:
                     pygame.quit()
-                    sys.exit()
 
             self.bg.update()
             bg_img, bg_rect = mask(self.bg.image, self.bg.rect)
@@ -136,5 +159,9 @@ class TreviFountainGame:
 
 
 if __name__ == "__main__":
-    game = TreviFountainGame()
-    game.run()
+    try:
+        game = TreviFountainGame()
+        game.run()
+    finally:
+        GPIO.cleanup()
+        sys.exit()
