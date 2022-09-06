@@ -1,14 +1,15 @@
 import multiprocessing as mp
+from pathlib import Path
 import random
 import sys
 import time
 
-from hx711 import HX711  # import the class HX711
-import RPi.GPIO as GPIO  # import GPIO
+import RPi.GPIO as GPIO
+from hx711 import HX711
+import numpy as np
 import pygame
 from pygame.rect import Rect
 from pygame.surface import Surface
-import numpy as np
 
 from settings import *
 
@@ -62,9 +63,9 @@ class Object(pygame.sprite.Sprite):
 
 
 class Glowing(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, obj: Surface):
         super().__init__()
-        self.origin: Surface = pygame.transform.scale(GLOW_OBJ, SCREEN_SIZE)
+        self.origin: Surface = pygame.transform.scale(obj, SCREEN_SIZE)
         self.image: Surface = self.origin
         self.rect: Rect = self.image.get_rect(center=CENTER)
 
@@ -98,6 +99,11 @@ class TreviFountainGame:
 
         self.bg = Background(SCREEN_SIZE)
         self.objects = pygame.sprite.Group()
+        files = list(Path("./assets/obj/").glob("*.png"))
+        self.OBJS = [
+            pygame.image.load(str(file)).convert_alpha() for file in files
+        ]
+        self.GLOW_OBJ = pygame.image.load("./assets/glow.png").convert_alpha()
 
         # TODO: test mp.Queue
         self.queue = mp.Queue()
@@ -140,9 +146,9 @@ class TreviFountainGame:
             pygame.display.update()
 
     def obj_appear(self) -> None:
-        sel_idx = random.randint(0, len(OBJECTS) - 1)
-        obj = Object(OBJECTS[sel_idx], (250, 250))
-        glow = Glowing()
+        sel_idx = random.randint(0, len(self.OBJS) - 1)
+        obj = Object(self.OBJS[sel_idx], (250, 250))
+        glow = Glowing(self.GLOW_OBJ)
         self.objects.empty()
         self.objects.add(glow)
         self.objects.add(obj)
