@@ -94,7 +94,7 @@ class Glowing(pygame.sprite.Sprite):
 class TreviFountainGame:
     def __init__(self) -> None:
         pygame.init()
-        self.window = pygame.display.set_mode(SCREEN_SIZE)
+        self.window = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
         self.clock = pygame.time.Clock()
 
         self.bg = Background(SCREEN_SIZE)
@@ -107,7 +107,7 @@ class TreviFountainGame:
 
         # TODO: test mp.Queue
         self.queue = mp.Queue()
-        self.sensor = Worker(self.queue)
+        self.sensor = Sensor(self.queue)
 
         self.prev_data = 0
 
@@ -159,7 +159,7 @@ class TreviFountainGame:
         sys.exit()
 
 
-class Worker(mp.Process):
+class Sensor(mp.Process):
     def __init__(self, queue: mp.Queue) -> None:
         super().__init__()
         self.queue = queue
