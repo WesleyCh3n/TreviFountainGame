@@ -23,9 +23,7 @@ class Background(pygame.sprite.Sprite):
         self.size = size
 
     def update(self):
-        self.image = pygame.transform.smoothscale(
-            self.origin, self.size
-        )
+        self.image = pygame.transform.smoothscale(self.origin, self.size)
         self.size = (self.size[1] + 10, self.size[1] + 10)
         if self.size[0] == 1200:
             self.size = self.init_size
@@ -41,11 +39,9 @@ def mask(image: Surface, rect: Rect) -> tuple[Surface, Rect]:
 
 
 class Object(pygame.sprite.Sprite):
-    def __init__(self, image_path: str, size: tuple):
+    def __init__(self, image: Surface, size: tuple):
         super().__init__()
-        self.image: pygame.surface.Surface = pygame.transform.scale(
-            pygame.image.load(image_path), size
-        ).convert_alpha()
+        self.image: Surface = pygame.transform.scale(image, size)
         self.rect: pygame.rect.Rect = self.image.get_rect(center=CENTER)
 
         self.alpha = 0
@@ -68,9 +64,7 @@ class Object(pygame.sprite.Sprite):
 class Glowing(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.origin: pygame.surface.Surface = pygame.transform.scale(
-            pygame.image.load("./assets/glow.png"), SCREEN_SIZE
-        ).convert_alpha()
+        self.origin: Surface = pygame.transform.scale(GLOW_OBJ, SCREEN_SIZE)
         self.image: Surface = self.origin
         self.rect: Rect = self.image.get_rect(center=CENTER)
 
@@ -119,7 +113,7 @@ class TreviFountainGame:
             if not self.queue.empty():
                 data = self.queue.get()
                 gap = data - self.prev_data
-                print(f"{data=} {self.prev_data=} {gap=}", end='\r')
+                print(f"{data=} {self.prev_data=} {gap=}", end="\r")
                 if gap > 800 and gap < 10000:
                     print(f"Detect Object")
                     self.obj_appear()
@@ -146,8 +140,8 @@ class TreviFountainGame:
             pygame.display.update()
 
     def obj_appear(self) -> None:
-        sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-        obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
+        sel_idx = random.randint(0, len(OBJECTS) - 1)
+        obj = Object(OBJECTS[sel_idx], (250, 250))
         glow = Glowing()
         self.objects.empty()
         self.objects.add(glow)
@@ -157,7 +151,6 @@ class TreviFountainGame:
         self.sensor.kill()
         pygame.quit()
         sys.exit()
-
 
 
 class Worker(mp.Process):
@@ -179,6 +172,7 @@ class Worker(mp.Process):
         print("Cleaning up GPIO")
         GPIO.cleanup()
         return super().kill()
+
 
 if __name__ == "__main__":
     game = TreviFountainGame()
