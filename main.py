@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import random
 import sys
+import time
 
 from hx711 import HX711  # import the class HX711
 import RPi.GPIO as GPIO  # import GPIO
@@ -15,7 +16,7 @@ from settings import *
 class Background(pygame.sprite.Sprite):
     def __init__(self, size: tuple[int, int]):
         super().__init__()
-        self.origin = pygame.image.load(BACKGROUND_PATH)
+        self.origin = pygame.image.load(BACKGROUND_PATH).convert_alpha()
         self.image: Surface
         self.rect: Rect
         self.init_size = size
@@ -23,7 +24,7 @@ class Background(pygame.sprite.Sprite):
 
     def update(self):
         self.image = pygame.transform.smoothscale(
-            self.origin.convert_alpha(), self.size
+            self.origin, self.size
         )
         self.size = (self.size[1] + 10, self.size[1] + 10)
         if self.size[0] == 1200:
@@ -118,8 +119,9 @@ class TreviFountainGame:
             if not self.queue.empty():
                 data = self.queue.get()
                 gap = data - self.prev_data
-                print(f"{data=} {self.prev_data=} {gap=}")
-                if gap > 1000 and gap < 10000:
+                print(f"{data=} {self.prev_data=} {gap=}", end='\r')
+                if gap > 800 and gap < 10000:
+                    print(f"Detect Object")
                     self.obj_appear()
                 self.prev_data = data
 
@@ -128,11 +130,11 @@ class TreviFountainGame:
                     self.obj_appear()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
-                        pygame.quit()
+                        self.quit()
                     elif event.key == pygame.K_m:
                         pygame.display.toggle_fullscreen()
                 if event.type == pygame.QUIT:
-                    pygame.quit()
+                    self.quit()
 
             self.bg.update()
             bg_img, bg_rect = mask(self.bg.image, self.bg.rect)
@@ -154,6 +156,7 @@ class TreviFountainGame:
     def quit(self) -> None:
         self.sensor.kill()
         pygame.quit()
+        sys.exit()
 
 
 
@@ -170,6 +173,7 @@ class Worker(mp.Process):
     def run(self) -> None:
         while True:
             self.queue.put(-np.mean(self.hx.get_raw_data()))
+            time.sleep(0.00006)
 
     def kill(self) -> None:
         print("Cleaning up GPIO")
@@ -179,4 +183,3 @@ class Worker(mp.Process):
 if __name__ == "__main__":
     game = TreviFountainGame()
     game.run()
-    sys.exit()
