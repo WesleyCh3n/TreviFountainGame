@@ -108,16 +108,12 @@ class TreviFountainGame:
         self.queue = mp.Queue()
         self.sensor = Worker(self.queue)
 
-        self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel="A")
-        self.hx.reset()
         self.prev_data = 0
-        self.frame = 0
 
     def run(self):
         while True:
             self.window.fill(BLACK)
             self.clock.tick(FPS)
-            self.frame += 1
             # TODO: test mp.Queue
             if not self.queue.empty():
                 data = self.queue.get()
@@ -125,15 +121,7 @@ class TreviFountainGame:
                 print(f"{data=} {self.prev_data=} {gap=}")
                 if gap > 1000 and gap < 10000:
                     self.obj_appear()
-
-            if self.frame > int(FPS / 4):
-                data = -np.mean(self.hx.get_raw_data())
-                gap = data - self.prev_data
-                print(f"{data=} {self.prev_data=} {gap=}")
-                if gap > 1000 and gap < 10000:
-                    self.obj_appear()
                 self.prev_data = data
-                self.frame = 0
 
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
@@ -163,6 +151,11 @@ class TreviFountainGame:
         self.objects.add(glow)
         self.objects.add(obj)
 
+    def quit(self) -> None:
+        self.sensor.kill()
+        pygame.quit()
+
+
 
 class Worker(mp.Process):
     def __init__(self, queue: mp.Queue) -> None:
@@ -171,17 +164,19 @@ class Worker(mp.Process):
         print("Initialize HX711")
         self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel="A")
         self.hx.reset()
-        print("Initialize HX711 Finished")
+        print("Finished")
         self.start()
 
     def run(self) -> None:
-        self.queue.put(-np.mean(self.hx.get_raw_data()))
+        while True:
+            self.queue.put(-np.mean(self.hx.get_raw_data()))
 
+    def kill(self) -> None:
+        print("Cleaning up GPIO")
+        GPIO.cleanup()
+        return super().kill()
 
 if __name__ == "__main__":
-    try:
-        game = TreviFountainGame()
-        game.run()
-    finally:
-        GPIO.cleanup()
-        sys.exit()
+    game = TreviFountainGame()
+    game.run()
+    sys.exit()
