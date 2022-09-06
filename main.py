@@ -2,8 +2,8 @@ import multiprocessing as mp
 import random
 import sys
 
-from hx711 import HX711     # import the class HX711
-import RPi.GPIO as GPIO     # import GPIO
+from hx711 import HX711  # import the class HX711
+import RPi.GPIO as GPIO  # import GPIO
 import pygame
 from pygame.rect import Rect
 from pygame.surface import Surface
@@ -104,7 +104,11 @@ class TreviFountainGame:
         self.bg = Background(SCREEN_SIZE)
         self.objects = pygame.sprite.Group()
 
-        self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel='A')
+        # TODO: test mp.Queue
+        self.queue = mp.Queue()
+        self.sensor = Worker(self.queue)
+
+        self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel="A")
         self.hx.reset()
         self.prev_data = 0
         self.frame = 0
@@ -114,32 +118,26 @@ class TreviFountainGame:
             self.window.fill(BLACK)
             self.clock.tick(FPS)
             self.frame += 1
-            if self.frame > int(FPS/4):
+            # TODO: test mp.Queue
+            if not self.queue.empty():
+                data = self.queue.get()
+                gap = data - self.prev_data
+                print(f"{data=} {self.prev_data=} {gap=}")
+                if gap > 1000 and gap < 10000:
+                    self.obj_appear()
+
+            if self.frame > int(FPS / 4):
                 data = -np.mean(self.hx.get_raw_data())
                 gap = data - self.prev_data
                 print(f"{data=} {self.prev_data=} {gap=}")
                 if gap > 1000 and gap < 10000:
-                    sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-                    obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
-                    glow = Glowing()
-
-                    self.objects.empty()
-                    self.objects.add(glow)
-                    self.objects.add(obj)
-
+                    self.obj_appear()
                 self.prev_data = data
                 self.frame = 0
 
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-                    obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
-                    glow = Glowing()
-
-                    self.objects.empty()
-                    self.objects.add(glow)
-                    self.objects.add(obj)
-
+                    self.obj_appear()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
                         pygame.quit()
@@ -156,6 +154,28 @@ class TreviFountainGame:
             for obj in self.objects:
                 self.window.blit(obj.image, obj.rect)  # type: ignore
             pygame.display.update()
+
+    def obj_appear(self) -> None:
+        sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
+        obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
+        glow = Glowing()
+        self.objects.empty()
+        self.objects.add(glow)
+        self.objects.add(obj)
+
+
+class Worker(mp.Process):
+    def __init__(self, queue: mp.Queue) -> None:
+        super().__init__()
+        self.queue = queue
+        print("Initialize HX711")
+        self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel="A")
+        self.hx.reset()
+        print("Initialize HX711 Finished")
+        self.start()
+
+    def run(self) -> None:
+        self.queue.put(-np.mean(self.hx.get_raw_data()))
 
 
 if __name__ == "__main__":
