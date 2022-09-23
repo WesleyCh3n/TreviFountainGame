@@ -16,6 +16,10 @@ class Worker(mp.Process):
             self.queue.put(arr)
             time.sleep(2)
 
+    def kill(self) -> None:
+        print("kill called")
+        return super().kill()
+
 
 q = mp.Queue()
 w = Worker(10, q)
@@ -37,5 +41,5 @@ while 1:
         frame = 0
         sec += 1
         if sec == 5:
-            w.terminate()
+            w.kill()
             break

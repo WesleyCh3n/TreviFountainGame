@@ -1,13 +1,15 @@
 import multiprocessing as mp
+from pathlib import Path
 import random
 import sys
+import time
 
-from hx711 import HX711  # import the class HX711
-import RPi.GPIO as GPIO  # import GPIO
+import RPi.GPIO as GPIO
+from hx711 import HX711
+import numpy as np
 import pygame
 from pygame.rect import Rect
 from pygame.surface import Surface
-import numpy as np
 
 from settings import *
 
@@ -42,11 +44,9 @@ def mask(image: Surface, rect: Rect) -> tuple[Surface, Rect]:
 
 
 class Object(pygame.sprite.Sprite):
-    def __init__(self, image_path: str, size: tuple):
+    def __init__(self, image: Surface, size: tuple):
         super().__init__()
-        self.image: pygame.surface.Surface = pygame.transform.scale(
-            pygame.image.load(image_path), size
-        ).convert_alpha()
+        self.image: Surface = pygame.transform.scale(image, size)
         self.rect: pygame.rect.Rect = self.image.get_rect(center=CENTER)
 
         self.alpha = 0
@@ -67,7 +67,7 @@ class Object(pygame.sprite.Sprite):
 
 
 class Glowing(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, obj: Surface):
         super().__init__()
         self.origin: pygame.surface.Surface = pygame.transform.scale(
             pygame.image.load("./assets/glow.bmp"), (550, 550)
@@ -107,13 +107,17 @@ class TreviFountainGame:
 
         self.bg = Background(SCREEN_SIZE)
         self.objects = pygame.sprite.Group()
+        files = list(Path("./assets/obj/").glob("*.png"))
+        self.OBJS = [
+            pygame.image.load(str(file)).convert_alpha() for file in files
+        ]
+        self.GLOW_OBJ = pygame.image.load("./assets/glow.png").convert_alpha()
 
         # TODO: test mp.Queue
         self.queue = mp.Queue()
-        self.sensor = Worker(self.queue)
+        self.sensor = Sensor(self.queue)
 
         self.prev_data = 0
-        self.frame = 0
 
         pygame.mixer.music.load("./music/water.ogg")
         pygame.mixer.music.play(loops=-1)
@@ -123,12 +127,10 @@ class TreviFountainGame:
         while True:
             self.window.fill(BLACK)
             self.clock.tick(FPS)
-            self.frame += 1
-            # TODO: test mp.Queue
             if not self.queue.empty():
                 data = self.queue.get()
                 gap = data - self.prev_data
-                print(f"{data=} {self.prev_data=} {gap=}")
+                # print(f"{data=} {self.prev_data=} {gap=}")
                 # if gap > 700 and gap < 10000:
                 if gap > 700 and gap < 30000:
                     self.music_play()
@@ -158,8 +160,7 @@ class TreviFountainGame:
 
     def obj_appear(self) -> None:
         sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-        obj = Object(OBJECT_PATHS[sel_idx], (600, 600))
-        # glow = Glowing()
+        obj = Object(self.OBJS[sel_idx], (600, 600))
         self.objects.empty()
         # self.objects.add(glow)
         self.objects.add(obj)
@@ -174,23 +175,28 @@ class TreviFountainGame:
         pygame.mixer.music.stop()
         pygame.mixer.quit()
         pygame.quit()
-        GPIO.cleanup()
         sys.exit()
 
 
-class Worker(mp.Process):
+class Sensor(mp.Process):
     def __init__(self, queue: mp.Queue) -> None:
         super().__init__()
         self.queue = queue
         print("Initialize HX711")
         self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel="A")
         self.hx.reset()
-        print("Initialize HX711 Finished")
+        print("Finished")
         self.start()
 
     def run(self) -> None:
         while True:
             self.queue.put(np.mean(self.hx.get_raw_data()))
+            time.sleep(0.00006)
+
+    def kill(self) -> None:
+        print("Cleaning up GPIO")
+        GPIO.cleanup()
+        return super().kill()
 
 
 if __name__ == "__main__":
