@@ -11,11 +11,13 @@ import numpy as np
 
 from settings import *
 
+import os
+# os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 class Background(pygame.sprite.Sprite):
     def __init__(self, size: tuple[int, int]):
         super().__init__()
-        self.origin = pygame.image.load(BACKGROUND_PATH)
+        self.origin = pygame.image.load(BACKGROUND_PATH).convert()
         self.image: Surface
         self.rect: Rect
         self.init_size = size
@@ -23,7 +25,7 @@ class Background(pygame.sprite.Sprite):
 
     def update(self):
         self.image = pygame.transform.smoothscale(
-            self.origin.convert_alpha(), self.size
+            self.origin, self.size
         )
         self.size = (self.size[1] + 10, self.size[1] + 10)
         if self.size[0] == 1200:
@@ -68,7 +70,7 @@ class Glowing(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.origin: pygame.surface.Surface = pygame.transform.scale(
-            pygame.image.load("./assets/glow.png"), SCREEN_SIZE
+            pygame.image.load("./assets/glow.bmp"), (550, 550)
         ).convert_alpha()
         self.image: Surface = self.origin
         self.rect: Rect = self.image.get_rect(center=CENTER)
@@ -97,8 +99,10 @@ class Glowing(pygame.sprite.Sprite):
 
 class TreviFountainGame:
     def __init__(self) -> None:
+        PYGAME_BLEND_ALPHA_SDL2 = 1
+        pygame.mixer.init()
         pygame.init()
-        self.window = pygame.display.set_mode(SCREEN_SIZE)
+        self.window = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
         self.clock = pygame.time.Clock()
 
         self.bg = Background(SCREEN_SIZE)
@@ -108,10 +112,12 @@ class TreviFountainGame:
         self.queue = mp.Queue()
         self.sensor = Worker(self.queue)
 
-        self.hx = HX711(dout_pin=5, pd_sck_pin=6, gain=128, channel="A")
-        self.hx.reset()
         self.prev_data = 0
         self.frame = 0
+
+        pygame.mixer.music.load("./music/water.ogg")
+        pygame.mixer.music.play(loops=-1)
+        self.music_group = [pygame.mixer.Sound(p) for p in MUSIC_PATHS]
 
     def run(self):
         while True:
@@ -123,28 +129,23 @@ class TreviFountainGame:
                 data = self.queue.get()
                 gap = data - self.prev_data
                 print(f"{data=} {self.prev_data=} {gap=}")
-                if gap > 1000 and gap < 10000:
-                    self.obj_appear()
-
-            if self.frame > int(FPS / 4):
-                data = -np.mean(self.hx.get_raw_data())
-                gap = data - self.prev_data
-                print(f"{data=} {self.prev_data=} {gap=}")
-                if gap > 1000 and gap < 10000:
+                # if gap > 700 and gap < 10000:
+                if gap > 700 and gap < 30000:
+                    self.music_play()
                     self.obj_appear()
                 self.prev_data = data
-                self.frame = 0
 
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    self.music_play()
                     self.obj_appear()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q:
-                        pygame.quit()
-                    elif event.key == pygame.K_m:
-                        pygame.display.toggle_fullscreen()
+                        self.quit()
+                     # elif event.key == pygame.K_m:
+                     #     pygame.display.toggle_fullscreen()
                 if event.type == pygame.QUIT:
-                    pygame.quit()
+                    self.quit()
 
             self.bg.update()
             bg_img, bg_rect = mask(self.bg.image, self.bg.rect)
@@ -157,11 +158,24 @@ class TreviFountainGame:
 
     def obj_appear(self) -> None:
         sel_idx = random.randint(0, len(OBJECT_PATHS) - 1)
-        obj = Object(OBJECT_PATHS[sel_idx], (250, 250))
-        glow = Glowing()
+        obj = Object(OBJECT_PATHS[sel_idx], (600, 600))
+        # glow = Glowing()
         self.objects.empty()
-        self.objects.add(glow)
+        # self.objects.add(glow)
         self.objects.add(obj)
+
+    def music_play(self) -> None:
+        sel_idx = random.randint(0, len(self.music_group) - 1)
+        print(sel_idx)
+        self.music_group[sel_idx].play()
+
+    def quit(self) -> None:
+        self.sensor.kill()
+        pygame.mixer.music.stop()
+        pygame.mixer.quit()
+        pygame.quit()
+        GPIO.cleanup()
+        sys.exit()
 
 
 class Worker(mp.Process):
@@ -175,13 +189,10 @@ class Worker(mp.Process):
         self.start()
 
     def run(self) -> None:
-        self.queue.put(-np.mean(self.hx.get_raw_data()))
+        while True:
+            self.queue.put(np.mean(self.hx.get_raw_data()))
 
 
 if __name__ == "__main__":
-    try:
-        game = TreviFountainGame()
-        game.run()
-    finally:
-        GPIO.cleanup()
-        sys.exit()
+    game = TreviFountainGame()
+    game.run()
